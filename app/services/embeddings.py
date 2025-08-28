@@ -1,9 +1,23 @@
-from functools import lru_cache
-from sentence_transformers import SentenceTransformer
+from abc import ABC, abstractmethod
+import numpy as np
 
-@lru_cache(maxsize=1)
-def _model():
-    return SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+def as_passages(texts: list[str]) -> list[str]:
+    """Agrega el prefijo 'passage:' (requerido por E5)."""
+    return [f"passage: {t}" for t in texts]
 
-def embed_text(text: str) -> list[float]:
-    return _model().encode([text])[0].tolist()
+def as_queries(texts: list[str]) -> list[str]:
+    """Agrega el prefijo 'query:' (requerido por E5)."""
+    return [f"query: {t}" for t in texts]
+
+class EmbeddingProvider(ABC):
+    @abstractmethod
+    def embed_texts(self, texts: list[str]) -> np.ndarray:
+        ...
+
+class LocalE5Provider(EmbeddingProvider):
+    def __init__(self, model_name: str):
+        from sentence_transformers import SentenceTransformer
+        self.model = SentenceTransformer(model_name)
+
+    def embed_texts(self, texts: list[str]) -> np.ndarray:
+        return np.array(self.model.encode(texts, normalize_embeddings=True))
