@@ -1,3 +1,5 @@
+# app/services/vector_store.py
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -27,14 +29,22 @@ class QdrantIndex(VectorIndex):
 
     def upsert(self, ids, vectors, payloads):
         from qdrant_client.http import models as qm
+        # Qdrant acepta listas de float; asegurar tipo y forma
+        if hasattr(vectors, "tolist"):
+            vectors = vectors.tolist()
         self.client.upsert(
             collection_name=self.collection,
             points=qm.Batch(ids=ids, vectors=vectors, payloads=payloads),
         )
 
     def search(self, vector, top_k: int):
-        hits = self.client.search(collection_name=self.collection, query_vector=vector, limit=top_k)
-        # estandarizamos respuesta
+        if hasattr(vector, "tolist"):
+            vector = vector.tolist()
+        hits = self.client.search(
+            collection_name=self.collection,
+            query_vector=vector,
+            limit=top_k
+        )
         return [
             {"id": str(h.id), "score": float(h.score), "payload": h.payload}
             for h in hits
