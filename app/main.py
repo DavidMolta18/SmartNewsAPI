@@ -2,6 +2,7 @@
 from __future__ import annotations
 from fastapi import FastAPI, Body, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+import uuid
 
 from app.config import settings
 from app.services.embeddings import (
@@ -10,6 +11,9 @@ from app.services.embeddings import (
 )
 from app.services.vector_store import VectorIndex, QdrantIndex
 from app.ingestion.rss import fetch_feed, fetch_default
+from app.ingestion.quality import clean_text, should_index
+
+
 
 app = FastAPI(title="News Intelligence API")
 
@@ -41,9 +45,11 @@ try:
 except Exception as e:
     print("WARN ensure_collection:", e)
 
+
 @app.get("/health")
 def health():
     return {"ok": True}
+
 
 # ---------- /index ----------
 @app.post("/index")
@@ -56,29 +62,76 @@ async def index_endpoint(payload: dict = Body(default={})):
     if not articles:
         raise HTTPException(status_code=400, detail="No se obtuvieron artículos")
 
-    # 2) Preparar textos
-    texts = [a["content"] or (a["title"] + " " + a["url"]) for a in articles]
-    passages = as_passages(texts, prefix_required=getattr(embedding_provider, "requires_e5_prefix", False))
+    # 2) Limpiar + filtrar textos (doble seguro)
+    cleaned_articles, cleaned_texts = [], []
+    for a in articles:
+        txt = a.get("content") or (f"{a.get('title','')} {a.get('url','')}")
+        txt = clean_text(txt)
 
-    # 3) Embeddings
-    vecs = embedding_provider.embed_texts(passages)
+        ok, reason = should_index(txt, min_chars=400, min_score=700.0)
+        if not ok:
+            # Si quieres ver qué se descartó:
+            # print(f"SKIP index [{a.get('source')}] {a.get('title','')[:80]} -> {reason}")
+            continue
 
-    # 4) Upsert en índice vectorial
-    ids = [a["id"] for a in articles]
+        cleaned_articles.append(a)
+        cleaned_texts.append(txt)
+
+    if not cleaned_articles:
+        raise HTTPException(status_code=400, detail="Todos los artículos fueron descartados por baja calidad")
+
+    # 3) Debug: ver lo que realmente se embebe
+    print("\n=== ARTÍCULOS A EMBED (post-filtro) ===")
+    for art, txt in zip(cleaned_articles, cleaned_texts):
+        preview = (txt[:400] + "...") if len(txt) > 400 else txt
+        print(f"[{art['source']}] {art['title'][:80]}")
+        print(f"LEN={len(txt)} | Published: {art['published_at']}")
+        print(preview, "\n")
+
+    # 4) IDs y payloads
+    ids = [str(uuid.uuid4()) for _ in cleaned_articles]
+
+    def to_epoch(ts_iso: str | None) -> int | None:
+        if not ts_iso:
+            return None
+        try:
+            # ISO con Z / +00:00
+            return int(dt.datetime.fromisoformat(ts_iso.replace("Z", "+00:00")).timestamp())
+        except Exception:
+            return None
+
     payloads = [{
+        "article_id": a["id"],
         "title": a["title"],
         "url": a["url"],
         "published_at": a["published_at"],
+        "published_at_ts": to_epoch(a.get("published_at")),  # ⬅️ útil para ordenar/filtrar
         "source": a["source"],
-    } for a in articles]
+    } for a in cleaned_articles]
+
+    # 5) Embeddings con prefijo si aplica (E5)
+    passages = as_passages(
+        cleaned_texts,
+        prefix_required=getattr(embedding_provider, "requires_e5_prefix", False)
+    )
+
+    # 6) Generar embeddings
+    vecs = embedding_provider.embed_texts(passages)
+
+    # 7) Upsert en índice vectorial
     vector_index.upsert(ids=ids, vectors=vecs, payloads=payloads)
 
-    return {"indexed": len(articles)}
+    return {"indexed_articles": len(cleaned_articles)}
+
+
 
 # ---------- /search ----------
 @app.get("/search")
 def search_endpoint(q: str = Query(..., min_length=2), k: int = Query(5, ge=1, le=50)):
-    queries = as_queries([q], prefix_required=getattr(embedding_provider, "requires_e5_prefix", False))
+    queries = as_queries(
+        [q],
+        prefix_required=getattr(embedding_provider, "requires_e5_prefix", False)
+    )
     query_vec = embedding_provider.embed_texts(queries)[0]
 
     hits = vector_index.search(vector=query_vec, top_k=k)
@@ -89,6 +142,7 @@ def search_endpoint(q: str = Query(..., min_length=2), k: int = Query(5, ge=1, l
         "url": h["payload"].get("url"),
         "published_at": h["payload"].get("published_at"),
         "source": h["payload"].get("source"),
+        "article_id": h["payload"].get("article_id"),
     } for h in hits]
 
     return {"query": q, "results": results}

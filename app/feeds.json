@@ -1,0 +1,11 @@
+{
+  "feeds": [
+    "http://rss.cnn.com/rss/edition_world.rss",
+    "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+    "https://www.theguardian.com/world/rss",
+    "https://www.aljazeera.com/xml/rss/all.xml",
+    "https://feeds.bbci.co.uk/news/world/rss.xml",
+    "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/internacional/portada",
+    "https://www.eltiempo.com/rss/colombia.xml"
+  ]
+}
