@@ -15,7 +15,9 @@ jobs:
       - name: Checkout Infra Repo
         uses: actions/checkout@v3
         with:
+          repository: DavidMolta18/SmartNewsInfra
           path: infra
+          token: ${{ secrets.GH_PAT }}
 
       - name: Auth to GCP
         uses: google-github-actions/auth@v2
