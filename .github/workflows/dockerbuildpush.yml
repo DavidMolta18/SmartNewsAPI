@@ -32,7 +32,7 @@ jobs:
 
       - name: Build & Push Docker Image
         run: |
-          IMAGE="${{ secrets.REGION }}-docker.pkg.dev/${{ secrets.PROJECT_ID }}/smartnewsapi/smartnewsapi:pr-${{ github.event.pull_request.number }}"
+          IMAGE="${{ secrets.REGION }}-docker.pkg.dev/${{ secrets.PROJECT_ID }}/smartnewsapi/smartnewsapi:${{ github.sha }}"
           cd api
           docker build -t $IMAGE .
           docker push $IMAGE
