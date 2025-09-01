@@ -13,10 +13,17 @@ def to_epoch(ts_iso: str | None) -> int | None:
     except Exception:
         return None
 
+
 def is_429_error(err: Exception) -> bool:
     """Detect quota/capacity errors (HTTP 429-like) without SDK-specific imports."""
     s = str(err).lower()
-    return ("429" in s) or ("resource exhausted" in s) or ("quota exceeded" in s)
+    return (
+        "429" in s
+        or "resource exhausted" in s
+        or "quota exceeded" in s
+        or "exceeded for aiplatform" in s  
+        or "too many requests" in s         
+
 
 def embed_in_batches(
     texts: List[str],
