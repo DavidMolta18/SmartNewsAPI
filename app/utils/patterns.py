@@ -60,13 +60,19 @@ COMMON_PATTERNS = [
 RE_BOILER = re.compile("|".join(COMMON_PATTERNS), re.IGNORECASE)
 
 # For snippet filtering (lighter, UI-facing) — can be more aggressive
+# For snippet filtering (lighter, UI-facing)
 SNIPPET_NOISE = re.compile("|".join([
-    r"suscripci[oó]n",
+    # subscriptions / logins / consent
+    r"suscripci[oó]n",                
+    r"suscr[ií]b[ei]te",              
     r"inicia\s+sesi[oó]n",
     r"aceptar\s+cookies?",
     r"cookies?",
     r"privacy\s+policy",
+
+    # promos / CTAs
     r"newsletter",
+    r"\bbolet[ií]n\b",                
     r"haz\s+clic",
     r"haga\s+clic",
     r"contin[uú]a\s+leyendo",
@@ -76,11 +82,17 @@ SNIPPET_NOISE = re.compile("|".join([
     r"le\s+puede\s+interesar",
     r"vea\s+(?:tambi[eé]n|aqu[ií])",
     r"relacionad[oa]s?:?",
+
+    # device / ads / prefs
     r"solo\s+puedes\s+acceder",
     r"dispositivo",
     r"publicidad",
     r"anuncios?",
     r"configura\s+tus\s+preferencias",
+
+    # media embeds / consent banners
     r"ver\s+video",
     r"youtube\.com\/watch\?v=",
+    r"si\s+contin[uú]a\s+navegando",
 ]), re.IGNORECASE)
+
