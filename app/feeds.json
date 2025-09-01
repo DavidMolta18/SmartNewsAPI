@@ -1,0 +1,15 @@
+{
+  "feeds": [
+
+    "https://www.eltiempo.com/rss/colombia.xml",
+    "https://www.eltiempo.com/rss/politica.xml",
+    "https://www.eltiempo.com/rss/justicia.xml",
+    "https://www.eltiempo.com/rss/economia.xml",
+    "https://www.eltiempo.com/rss/mundo.xml",
+    "https://www.lafm.com.co/rss/colombia.xml",
+    "https://www.lafm.com.co/rss/politica.xml",
+    "https://www.lafm.com.co/rss/judicial.xml",
+    "https://www.lafm.com.co/rss/economia.xml",
+    "https://www.lafm.com.co/rss/internacional.xml"
+  ]
+}
