@@ -41,5 +41,5 @@ jobs:
         working-directory: ./infra
 
       - name: Terraform Plan
-        run: terraform plan -no-color
+        run: terraform plan -no-color -lock=false -var="image_url=placeholder"
         working-directory: ./infra
