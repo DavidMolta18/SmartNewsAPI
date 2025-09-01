@@ -36,13 +36,24 @@ jobs:
         run: terraform init -input=false
         working-directory: ./infra
 
+      - name: Wait for latest image
+        run: |
+          echo "Waiting for :latest image to be available in Artifact Registry..."
+          for i in {1..6}; do
+            gcloud artifacts docker tags list \
+              ${{ secrets.REGION }}-docker.pkg.dev/${{ secrets.PROJECT_ID }}/smartnewsapi/smartnewsapi \
+              --format="get(TAG)" | grep "latest" && break
+            echo "Not available yet, retrying in 10s..."
+            sleep 10
+          done
+
       - name: Terraform Apply
         run: |
           terraform apply -auto-approve \
             -var="project_id=${{ secrets.PROJECT_ID }}" \
             -var="region=${{ secrets.REGION }}" \
             -var="service_name=smartnewsapi" \
-            -var="image_url=${{ secrets.REGION }}-docker.pkg.dev/${{ secrets.PROJECT_ID }}/smartnewsapi/smartnewsapi:${{ github.sha }}" \
+            -var="image_url=${{ secrets.REGION }}-docker.pkg.dev/${{ secrets.PROJECT_ID }}/smartnewsapi/smartnewsapi:latest" \
             -var="qdrant_url=${{ secrets.QDRANT_URL }}" \
             -var="qdrant_api_key=${{ secrets.QDRANT_API_KEY }}"
         working-directory: ./infra
