@@ -37,3 +37,13 @@ jobs:
           docker build -t $IMAGE .
           docker push $IMAGE
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Wait for image availability
+        run: |
+          echo "Waiting for image $IMAGE to be available in Artifact Registry..."
+          for i in {1..6}; do
+            gcloud artifacts docker images list ${{ secrets.REGION }}-docker.pkg.dev/${{ secrets.PROJECT_ID }}/smartnewsapi \
+              --format="get(DISPLAY_NAME)" | grep "${{ github.sha }}" && break
+            echo "Not available yet, retrying in 10s..."
+            sleep 10
+          done
