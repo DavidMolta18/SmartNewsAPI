@@ -75,7 +75,6 @@ class QdrantIndex(VectorIndex):
                     field_schema=ftype,
                 )
             except Exception:
-                # Already exists or not allowed in current plan
                 pass
 
     def ensure_collection(self, dim: int) -> None:
@@ -98,7 +97,6 @@ class QdrantIndex(VectorIndex):
         if hasattr(vectors, "tolist"):
             vectors = vectors.tolist()
 
-        # asociamos los embeddings al vector name definido en Qdrant
         self.client.upsert(
             collection_name=self.collection,
             points=qm.Batch(ids=ids, vectors={"vector": vectors}, payloads=payloads),
@@ -121,7 +119,6 @@ class QdrantIndex(VectorIndex):
         if hnsw_ef is not None:
             search_params = qm.SearchParams(hnsw_ef=int(hnsw_ef), exact=False)
 
-        # ✅ usamos NamedVector con name="vector"
         hits = self.client.search(
             collection_name=self.collection,
             query_vector=qm.NamedVector(name="vector", vector=vector),
@@ -159,7 +156,6 @@ class QdrantIndex(VectorIndex):
         if hnsw_ef is not None:
             search_params = qm.SearchParams(hnsw_ef=int(hnsw_ef), exact=False)
 
-        # ✅ igual aquí con NamedVector
         res = self.client.search_groups(
             collection_name=self.collection,
             query_vector=qm.NamedVector(name="vector", vector=vector),
