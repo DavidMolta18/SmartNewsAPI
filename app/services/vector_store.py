@@ -1,4 +1,3 @@
-# app/services/vector_store.py
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Optional
@@ -9,7 +8,7 @@ class VectorIndex(ABC):
 
     @abstractmethod
     def ensure_collection(self, dim: int) -> None:
-        """Create the collection if missing and make sure vector params & payload indexes exist."""
+        """Check that the collection exists, otherwise warn."""
         ...
 
     @abstractmethod
@@ -24,18 +23,16 @@ class VectorIndex(ABC):
         top_k: int,
         qfilter: Any | None = None,
         hnsw_ef: Optional[int] = None,
-        with_vectors: bool = False,   # <-- NUEVO (opcional)
+        with_vectors: bool = False,
     ) -> list[dict[str, Any]]:
         """
         ANN search by vector. Optional:
           - qfilter: Qdrant filter object (pass-through)
           - hnsw_ef: runtime ef value for better recall on HNSW
           - with_vectors: return stored point vectors in results (if backend supports it)
-        Returns a flat list of hits with id/score/payload and (optionally) vector.
         """
         ...
 
-    # Optional convenience: server-side grouping (useful when chunking)
     def search_grouped(
         self,
         vector,
@@ -45,35 +42,24 @@ class VectorIndex(ABC):
         qfilter: Any | None = None,
         hnsw_ef: Optional[int] = None,
     ) -> list[list[dict[str, Any]]]:
-        """
-        Group hits by a payload field (e.g., "article_id") and return up to `top_k` groups,
-        each with up to `group_size` hits. If unsupported by the backend, override/raise.
-        """
         raise NotImplementedError
 
 
 class QdrantIndex(VectorIndex):
     """
     Qdrant-backed vector index.
-    - COSINE distance with L2-normalized embeddings (as produced by your providers)
-    - Payload indexes on fields we filter/sort by
-    - Optional runtime HNSW ef to trade recall/latency
+    Supports Qdrant Cloud (API key auth) or local Qdrant (no API key).
     """
 
-    def __init__(self, url: str, collection: str):
+    def __init__(self, url: str, collection: str, api_key: str | None = None):
         from qdrant_client import QdrantClient
 
-        # HTTP client is fine for local/dev; you can switch to gRPC with prefer_grpc=True
-        self.client = QdrantClient(url=url)
+        # Conectar con Qdrant Cloud usando API key
+        self.client = QdrantClient(url=url, api_key=api_key, prefer_grpc=False, timeout=30.0)
         self.collection = collection
 
-    # ---------- internal helpers ----------
-
     def _create_payload_indexes(self) -> None:
-        """
-        Create payload indexes (idempotent). We do it every boot since Qdrant ignores duplicates.
-        Indexing these fields speeds up filters & grouping.
-        """
+        """Ensure useful payload indexes exist (safe to skip on Cloud free)."""
         from qdrant_client.http import models as qm
 
         to_index: list[tuple[str, qm.PayloadSchemaType]] = [
@@ -90,40 +76,33 @@ class QdrantIndex(VectorIndex):
                     field_schema=ftype,
                 )
             except Exception:
-                # Already exists or version without this feature — safe to ignore
+                # Already exists or not allowed in current plan
                 pass
 
-    # ---------- VectorIndex API ----------
-
     def ensure_collection(self, dim: int) -> None:
-        """Ensure collection exists with the right vector params + payload indexes."""
-        from qdrant_client.http import models as qm
-
+        """Check if the collection exists in Qdrant Cloud, but don't try to create it."""
         try:
             existing = [c.name for c in self.client.get_collections().collections]
-        except Exception:
-            existing = []
-
-        if self.collection not in existing:
-            # Default HNSW config with cosine distance
-            self.client.create_collection(
-                collection_name=self.collection,
-                vectors_config=qm.VectorParams(size=dim, distance=qm.Distance.COSINE),
-            )
-
-        # Make sure payload indexes are in place (idempotent)
-        self._create_payload_indexes()
+            if self.collection not in existing:
+                raise RuntimeError(
+                    f"[ERROR] Collection '{self.collection}' not found in Qdrant Cloud. "
+                    f"Please create it manually (dim={dim}, metric=cosine, vector_name='vector')."
+                )
+            else:
+                print(f"[INFO] Collection '{self.collection}' is available.")
+        except Exception as e:
+            print("[WARN ensure_collection skipped]:", e)
 
     def upsert(self, ids, vectors, payloads):
-        """Upsert points in batch; accepts numpy arrays for vectors."""
         from qdrant_client.http import models as qm
 
         if hasattr(vectors, "tolist"):
             vectors = vectors.tolist()
 
+        # asociamos los embeddings al vector name definido en Qdrant
         self.client.upsert(
             collection_name=self.collection,
-            points=qm.Batch(ids=ids, vectors=vectors, payloads=payloads),
+            points=qm.Batch(ids=ids, vectors={"vector": vectors}, payloads=payloads),
         )
 
     def search(
@@ -132,9 +111,8 @@ class QdrantIndex(VectorIndex):
         top_k: int,
         qfilter: Any | None = None,
         hnsw_ef: Optional[int] = None,
-        with_vectors: bool = False,   # <-- NUEVO (opcional)
+        with_vectors: bool = False,
     ):
-        """Standard ANN search with optional runtime ef override and optional vector return."""
         from qdrant_client.http import models as qm
 
         if hasattr(vector, "tolist"):
@@ -142,16 +120,16 @@ class QdrantIndex(VectorIndex):
 
         search_params = None
         if hnsw_ef is not None:
-            # exact=False keeps ANN; set exact=True if you need brute-force rerank (slower)
             search_params = qm.SearchParams(hnsw_ef=int(hnsw_ef), exact=False)
 
+        # ✅ usamos NamedVector con name="vector"
         hits = self.client.search(
             collection_name=self.collection,
-            query_vector=vector,
+            query_vector=qm.NamedVector(name="vector", vector=vector),
             limit=top_k,
             query_filter=qfilter,
             search_params=search_params,
-            with_vectors=with_vectors,   # <-- se lo pasamos al cliente
+            with_vectors=with_vectors,
         )
 
         return [
@@ -159,7 +137,7 @@ class QdrantIndex(VectorIndex):
                 "id": str(h.id),
                 "score": float(h.score),
                 "payload": h.payload,
-                "vector": (h.vector if with_vectors else None),  # <-- devolvemos vector si se pidió
+                "vector": (h.vector if with_vectors else None),
             }
             for h in hits
         ]
@@ -173,10 +151,6 @@ class QdrantIndex(VectorIndex):
         qfilter: Any | None = None,
         hnsw_ef: Optional[int] = None,
     ) -> list[list[dict[str, Any]]]:
-        """
-        Use Qdrant's server-side grouping. This is great when you index multiple chunks
-        per article and want the best chunk(s) for each top article in one call.
-        """
         from qdrant_client.http import models as qm
 
         if hasattr(vector, "tolist"):
@@ -186,12 +160,13 @@ class QdrantIndex(VectorIndex):
         if hnsw_ef is not None:
             search_params = qm.SearchParams(hnsw_ef=int(hnsw_ef), exact=False)
 
+        # ✅ igual aquí con NamedVector
         res = self.client.search_groups(
             collection_name=self.collection,
-            query_vector=vector,
-            limit=top_k,            # number of groups (e.g., articles)
-            group_by=group_by,      # e.g., "article_id"
-            group_size=group_size,  # how many hits per group (e.g., top 3 chunks)
+            query_vector=qm.NamedVector(name="vector", vector=vector),
+            limit=top_k,
+            group_by=group_by,
+            group_size=group_size,
             query_filter=qfilter,
             search_params=search_params,
         )
