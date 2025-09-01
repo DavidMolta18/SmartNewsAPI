@@ -27,26 +27,12 @@ jobs:
     - name: Configure Docker auth
       run: gcloud auth configure-docker ${{ secrets.REGION }}-docker.pkg.dev
 
-    - name: Cache Docker layers
-      uses: actions/cache@v3
-      with:
-        path: /tmp/.buildx-cache
-        key: ${{ runner.os }}-docker-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-docker-
-
     - name: Build & Push Docker Image
       run: |
         IMAGE="${{ secrets.REGION }}-docker.pkg.dev/${{ secrets.PROJECT_ID }}/smartnewsapi/smartnewsapi:${{ github.sha }}"
-        docker build --cache-from=type=local,src=/tmp/.buildx-cache \
-                     --cache-to=type=local,dest=/tmp/.buildx-cache-new \
-                     -t $IMAGE .
+        docker build -t $IMAGE .
         docker push $IMAGE
         echo "IMAGE=$IMAGE" >> $GITHUB_ENV
-      # Mueve cache
-      post-run: |
-        rm -rf /tmp/.buildx-cache
-        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
     - name: Checkout Infra Repo
       uses: actions/checkout@v3
