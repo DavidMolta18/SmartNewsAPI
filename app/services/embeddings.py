@@ -1,4 +1,3 @@
-# app/services/embeddings.py
 from __future__ import annotations
 from abc import ABC, abstractmethod
 import numpy as np
@@ -41,26 +40,21 @@ class VertexEmbeddingProvider(EmbeddingProvider):
 
     def __init__(self, model_name: str = "text-embedding-004",
                  project: str | None = None, location: str = "us-central1"):
-        # Import correcto: usar el SDK 'vertexai'
         try:
             from vertexai import init as vertexai_init
             try:
-                # GA
                 from vertexai.language_models import TextEmbeddingModel
             except Exception:
-                # Fallback a preview si tu versión lo trae así
                 from vertexai.preview.language_models import TextEmbeddingModel
         except ImportError as e:
             raise RuntimeError(
                 "Falta el SDK de Vertex AI. Ejecuta: pip install --upgrade google-cloud-aiplatform"
             ) from e
 
-        # Inicializa Vertex para este proyecto/región
         vertexai_init(project=project, location=location)
         self._TextEmbeddingModel = TextEmbeddingModel
         self._model_name = model_name
 
-        # Cargar modelo y detectar dimensión
         model = self._TextEmbeddingModel.from_pretrained(self._model_name)
         sample = model.get_embeddings(["ping"])[0].values
         self.dim = len(sample)
@@ -69,6 +63,6 @@ class VertexEmbeddingProvider(EmbeddingProvider):
         model = self._TextEmbeddingModel.from_pretrained(self._model_name)
         embs = model.get_embeddings(texts)
         arr = np.asarray([e.values for e in embs], dtype=np.float32)
-        # Normalización L2 para COSINE en Qdrant
+
         norms = np.linalg.norm(arr, axis=1, keepdims=True) + 1e-12
         return (arr / norms).astype(np.float32)

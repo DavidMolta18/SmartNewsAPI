@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     # ---------------------------
     qdrant_url: str = "http://localhost:6333"
     qdrant_collection: str = "articles"
-    qdrant_api_key: str | None = None   # <-- NUEVO para Qdrant Cloud
+    qdrant_api_key: str | None = None   
 
     # ---------------------------
     # Embeddings

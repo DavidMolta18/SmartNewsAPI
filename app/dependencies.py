@@ -32,7 +32,7 @@ def get_vector_index(
     vi = QdrantIndex(
         url=settings.qdrant_url,
         collection=settings.qdrant_collection,
-        api_key=settings.qdrant_api_key,   # <-- ahora pasa la API key
+        api_key=settings.qdrant_api_key,  
     )
     try:
         vi.ensure_collection(dim=getattr(provider, "dim", 384))

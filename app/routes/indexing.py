@@ -1,4 +1,3 @@
-# app/routes/indexing.py
 import uuid
 import asyncio
 import random

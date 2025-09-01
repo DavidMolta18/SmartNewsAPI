@@ -1,4 +1,3 @@
-# app/routes/feeds.py
 from fastapi import APIRouter
 from app.ingestion.rss import load_default_feeds
 

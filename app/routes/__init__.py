@@ -1,4 +1,3 @@
-#app/routes/__init__.py
 from fastapi import APIRouter
 from . import health, indexing, search, feeds
 
