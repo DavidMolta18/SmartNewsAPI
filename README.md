@@ -9,7 +9,6 @@ La API ofrece:
 - Búsqueda semántica con embeddings.  
 - Soporte para chunking tradicional y chunking inteligente (Gemini).  
 - Vector Store con Qdrant.  
-- Manejo robusto de cuotas (**429 → convertido en 503**).  
 
 ---
 
@@ -101,3 +100,4 @@ La API ofrece:
 - **Contenerización:** Dockerfile para empaquetar la app.  
 - **Infraestructura:** Terraform define Cloud Run, permisos.  
 - **CI/CD:** Al hacer push → se ejecuta el build, y se despliega automáticamente.  
+
