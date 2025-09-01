@@ -29,7 +29,11 @@ def get_vector_index(
     provider: EmbeddingProvider = Depends(get_embedding_provider)
 ) -> VectorIndex:
     """Return a singleton vector index, ensuring collection exists."""
-    vi = QdrantIndex(settings.qdrant_url, settings.qdrant_collection)
+    vi = QdrantIndex(
+        url=settings.qdrant_url,
+        collection=settings.qdrant_collection,
+        api_key=settings.qdrant_api_key,   # <-- ahora pasa la API key
+    )
     try:
         vi.ensure_collection(dim=getattr(provider, "dim", 384))
     except Exception as e:
