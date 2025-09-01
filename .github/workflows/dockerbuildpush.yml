@@ -1,0 +1,63 @@
+name: Build & Deploy API
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-push-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout API
+        uses: actions/checkout@v3
+        with:
+          path: api
+
+      - name: Auth to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: smartnews-deployer@${{ secrets.PROJECT_ID }}.iam.gserviceaccount.com
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker auth
+        run: gcloud auth configure-docker ${{ secrets.REGION }}-docker.pkg.dev
+
+      - name: Build & Push Docker Image
+        run: |
+          IMAGE="${{ secrets.REGION }}-docker.pkg.dev/${{ secrets.PROJECT_ID }}/smartnewsapi/smartnewsapi:${{ github.sha }}"
+          cd api
+          docker build -t $IMAGE .
+          docker push $IMAGE
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Checkout Infra Repo
+        uses: actions/checkout@v3
+        with:
+          repository: DavidMolta18/SmartNewsInfra
+          path: infra
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        run: terraform init -input=false
+        working-directory: ./infra
+
+      - name: Terraform Apply (update Cloud Run with image)
+        run: |
+          terraform apply -auto-approve \
+            -var="project_id=${{ secrets.PROJECT_ID }}" \
+            -var="region=${{ secrets.REGION }}" \
+            -var="service_name=smartnewsapi" \
+            -var="image_url=$IMAGE" \
+            -var="qdrant_url=${{ secrets.QDRANT_URL }}" \
+            -var="qdrant_api_key=${{ secrets.QDRANT_API_KEY }}"
+        working-directory: ./infra
