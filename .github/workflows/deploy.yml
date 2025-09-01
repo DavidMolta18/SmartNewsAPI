@@ -1,0 +1,57 @@
+name: Build and Deploy SmartNewsAPI
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+    - name: Checkout API
+      uses: actions/checkout@v3
+
+    - name: Auth to GCP
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+        service_account: ${{ secrets.DEPLOYER_SA }}
+
+    - name: Setup gcloud
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Configure Docker auth
+      run: gcloud auth configure-docker ${{ secrets.REGION }}-docker.pkg.dev
+
+    - name: Build & Push Docker Image
+      run: |
+        IMAGE="${{ secrets.REGION }}-docker.pkg.dev/${{ secrets.PROJECT_ID }}/smartnewsapi/smartnewsapi:${{ github.sha }}"
+        docker build -t $IMAGE .
+        docker push $IMAGE
+        echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+    - name: Checkout Infra Repo
+      uses: actions/checkout@v3
+      with:
+        repository: tuusuario/SmartNewsInfra
+        path: infra
+        token: ${{ secrets.GH_PAT }}   
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+
+    - name: Terraform Init
+      run: terraform init
+      working-directory: ./infra
+
+    - name: Terraform Apply
+      run: terraform apply -auto-approve \
+        -var="project_id=${{ secrets.PROJECT_ID }}" \
+        -var="region=${{ secrets.REGION }}" \
+        -var="service_name=smartnewsapi" \
+        -var="image_url=$IMAGE"
+      working-directory: ./infra
