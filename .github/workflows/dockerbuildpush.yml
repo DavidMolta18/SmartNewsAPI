@@ -1,15 +1,12 @@
-name: Build & Deploy API
+name: Build and Push Docker Image to Artifact Registry
 
 on:
-  push:
-    branches: [ "main" ]
-
-permissions:
-  contents: read
-  id-token: write
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  build-push-deploy:
+  build-and-push:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout API
@@ -31,33 +28,11 @@ jobs:
 
       - name: Build & Push Docker Image
         run: |
-          IMAGE="${{ secrets.REGION }}-docker.pkg.dev/${{ secrets.PROJECT_ID }}/smartnewsapi/smartnewsapi:${{ github.sha }}"
+          IMAGE="${{ secrets.REGION }}-docker.pkg.dev/${{ secrets.PROJECT_ID }}/smartnewsapi/smartnewsapi:pr-${{ github.event.pull_request.number }}"
           cd api
           docker build -t $IMAGE .
           docker push $IMAGE
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
 
-      - name: Checkout Infra Repo
-        uses: actions/checkout@v3
-        with:
-          repository: DavidMolta18/SmartNewsInfra
-          path: infra
-          token: ${{ secrets.GH_PAT }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-
-      - name: Terraform Init
-        run: terraform init -input=false
-        working-directory: ./infra
-
-      - name: Terraform Apply (update Cloud Run with image)
-        run: |
-          terraform apply -auto-approve \
-            -var="project_id=${{ secrets.PROJECT_ID }}" \
-            -var="region=${{ secrets.REGION }}" \
-            -var="service_name=smartnewsapi" \
-            -var="image_url=$IMAGE" \
-            -var="qdrant_url=${{ secrets.QDRANT_URL }}" \
-            -var="qdrant_api_key=${{ secrets.QDRANT_API_KEY }}"
-        working-directory: ./infra
+      - name: Output Image Info
+        run: echo "Docker image built and pushed successfully: $IMAGE"

@@ -1,12 +1,13 @@
-name: Terraform Plan
+name: Terraform Plan and Validate
 
 on:
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
 permissions:
-  contents: read
   id-token: write
+  contents: read
   pull-requests: write
 
 jobs:
@@ -41,5 +42,5 @@ jobs:
         working-directory: ./infra
 
       - name: Terraform Plan
-        run: terraform plan -no-color -lock=false -var="image_url=placeholder"
+        run: terraform plan -no-color -lock=false -var="image_url="
         working-directory: ./infra
