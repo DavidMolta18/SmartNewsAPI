@@ -1,5 +1,4 @@
 name: Build and Deploy SmartNewsAPI
- #Testss
 on:
   push:
     branches: [ "main" ]
@@ -42,10 +41,11 @@ jobs:
 
     # 6. Terraform Apply Infra Base (Artifact Registry + IAM + Cloud Run "skeleton")
     - name: Terraform Apply Infra Base
-      run: terraform apply -auto-approve \
-        -var="project_id=${{ secrets.PROJECT_ID }}" \
-        -var="region=${{ secrets.REGION }}" \
-        -var="service_name=smartnewsapi"
+      run: |
+        terraform apply -auto-approve \
+          -var="project_id=${{ secrets.PROJECT_ID }}" \
+          -var="region=${{ secrets.REGION }}" \
+          -var="service_name=smartnewsapi"
       working-directory: ./infra
 
     # 7. Checkout API
@@ -69,11 +69,12 @@ jobs:
 
     # 10. Terraform Apply Final (actualiza Cloud Run con la imagen recién subida)
     - name: Terraform Apply Final
-      run: terraform apply -auto-approve \
-        -var="project_id=${{ secrets.PROJECT_ID }}" \
-        -var="region=${{ secrets.REGION }}" \
-        -var="service_name=smartnewsapi" \
-        -var="image_url=$IMAGE" \
-        -var="qdrant_url=${{ secrets.QDRANT_URL }}" \
-        -var="qdrant_api_key=${{ secrets.QDRANT_API_KEY }}"
+      run: |
+        terraform apply -auto-approve \
+          -var="project_id=${{ secrets.PROJECT_ID }}" \
+          -var="region=${{ secrets.REGION }}" \
+          -var="service_name=smartnewsapi" \
+          -var="image_url=$IMAGE" \
+          -var="qdrant_url=${{ secrets.QDRANT_URL }}" \
+          -var="qdrant_api_key=${{ secrets.QDRANT_API_KEY }}"
       working-directory: ./infra
