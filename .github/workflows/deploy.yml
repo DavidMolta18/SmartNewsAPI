@@ -2,7 +2,7 @@ name: Build and Deploy SmartNewsAPI
 on:
   push:
     branches: [ "main" ]
-
+# Test
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
