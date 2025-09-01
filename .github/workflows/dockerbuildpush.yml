@@ -33,6 +33,3 @@ jobs:
           docker build -t $IMAGE .
           docker push $IMAGE
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
-
-      - name: Output Image Info
-        run: echo "Docker image built and pushed successfully: $IMAGE"
