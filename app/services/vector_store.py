@@ -24,12 +24,14 @@ class VectorIndex(ABC):
         top_k: int,
         qfilter: Any | None = None,
         hnsw_ef: Optional[int] = None,
+        with_vectors: bool = False,   # <-- NUEVO (opcional)
     ) -> list[dict[str, Any]]:
         """
         ANN search by vector. Optional:
           - qfilter: Qdrant filter object (pass-through)
           - hnsw_ef: runtime ef value for better recall on HNSW
-        Returns a flat list of hits with id/score/payload.
+          - with_vectors: return stored point vectors in results (if backend supports it)
+        Returns a flat list of hits with id/score/payload and (optionally) vector.
         """
         ...
 
@@ -130,8 +132,9 @@ class QdrantIndex(VectorIndex):
         top_k: int,
         qfilter: Any | None = None,
         hnsw_ef: Optional[int] = None,
+        with_vectors: bool = False,   # <-- NUEVO (opcional)
     ):
-        """Standard ANN search with optional runtime ef override."""
+        """Standard ANN search with optional runtime ef override and optional vector return."""
         from qdrant_client.http import models as qm
 
         if hasattr(vector, "tolist"):
@@ -148,10 +151,16 @@ class QdrantIndex(VectorIndex):
             limit=top_k,
             query_filter=qfilter,
             search_params=search_params,
+            with_vectors=with_vectors,   # <-- se lo pasamos al cliente
         )
 
         return [
-            {"id": str(h.id), "score": float(h.score), "payload": h.payload}
+            {
+                "id": str(h.id),
+                "score": float(h.score),
+                "payload": h.payload,
+                "vector": (h.vector if with_vectors else None),  # <-- devolvemos vector si se pidió
+            }
             for h in hits
         ]
 
@@ -180,9 +189,9 @@ class QdrantIndex(VectorIndex):
         res = self.client.search_groups(
             collection_name=self.collection,
             query_vector=vector,
-            limit=top_k,           # number of groups (e.g., articles)
-            group_by=group_by,     # e.g., "article_id"
-            group_size=group_size, # how many hits per group (e.g., top 3 chunks)
+            limit=top_k,            # number of groups (e.g., articles)
+            group_by=group_by,      # e.g., "article_id"
+            group_size=group_size,  # how many hits per group (e.g., top 3 chunks)
             query_filter=qfilter,
             search_params=search_params,
         )

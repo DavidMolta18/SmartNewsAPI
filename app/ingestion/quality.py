@@ -2,6 +2,7 @@
 from __future__ import annotations
 import re
 from typing import List, Tuple
+from html import unescape
 from app.utils.patterns import RE_BOILER  # central boilerplate regex
 
 # =============================================================================
@@ -13,6 +14,13 @@ from app.utils.patterns import RE_BOILER  # central boilerplate regex
 
 DEBUG = False  # Toggle verbose debug logs for development
 
+# --- Try optional HTML parser ---
+try:
+    from bs4 import BeautifulSoup  # type: ignore
+    _HAS_BS4 = True
+except Exception:
+    _HAS_BS4 = False
+
 # --- Regex helpers ---
 _NAVLIKE_LINE = re.compile(
     r"^(?:menu|men[uú]|home|inicio|buscar|search|portada|última hora)$",
@@ -22,6 +30,56 @@ _RE_LINK = re.compile(r"https?://|www\.", re.IGNORECASE)
 _SENT_SPLIT = re.compile(r"(?<=[\.\?\!])\s+")
 _RE_BLANKS = re.compile(r"\n{3,}")   # collapse 3+ newlines into 2
 _RE_SPACES = re.compile(r"[ \t]{2,}")  # collapse multiple spaces/tabs
+_TAG_RE = re.compile(r"<[^>]+>")  # generic HTML tag stripper
+_CDATA_OPEN = re.compile(r"<!\[CDATA\[", re.IGNORECASE)
+_CDATA_CLOSE = re.compile(r"\]\]>", re.IGNORECASE)
+
+# Elimina bloques completos de medios incrustados comunes que no aportan texto
+_REMOVE_BLOCK_TAGS = re.compile(
+    r"</?(?:script|style|noscript|iframe|figure|figcaption|video|audio|source|picture|svg|canvas|form|input|button)[^>]*>",
+    re.IGNORECASE,
+)
+
+# ----------------------------------------------------------------------
+# HTML / markup stripping
+# ----------------------------------------------------------------------
+def strip_html(raw: str) -> str:
+    """
+    Remove CDATA wrappers, HTML tags, embedded media blocks and normalize entities.
+    Prefer BeautifulSoup when available; fallback to regex otherwise.
+    """
+    if not raw:
+        return ""
+
+    # Quita CDATA
+    raw = _CDATA_OPEN.sub("", raw)
+    raw = _CDATA_CLOSE.sub("", raw)
+
+    # A veces el feed trae bloques de media/players dentro de content:encoded
+    raw = _REMOVE_BLOCK_TAGS.sub(" ", raw)
+
+    if _HAS_BS4:
+        try:
+            soup = BeautifulSoup(raw, "lxml")  # lxml es rápido y robusto si está disponible
+            # Eliminamos también script/style por si el parser los conserva
+            for tag in soup(["script", "style"]):
+                tag.decompose()
+            text = soup.get_text(" ")  # separador de espacios para no pegar palabras
+        except Exception:
+            # Fallback duro a regex si algo falla en bs4/lxml
+            text = _TAG_RE.sub(" ", raw)
+    else:
+        text = _TAG_RE.sub(" ", raw)
+
+    # Decodifica &amp; &quot; etc
+    text = unescape(text)
+
+    # Limpieza básica de espacios
+    text = re.sub(r"[ \t\r\f\v]+", " ", text)
+    # Restituye saltos lógicos básicos donde había párrafos
+    text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)
+    return text.strip()
+
 
 # ----------------------------------------------------------------------
 # Internal helpers
@@ -107,16 +165,21 @@ def _filter_sentences(sentences: List[str]) -> List[str]:
 def clean_text(txt: str) -> str:
     """
     Conservative cleaner for raw article text.
-    - Normalize whitespace and line endings
-    - Drop nav-like labels and obvious boilerplate lines
-    - Lightly filter sentences (short, shouty, boiler-like)
-    - Reassemble into coherent paragraphs
+    Pipeline (now with HTML stripping first):
+      0) strip_html: remove CDATA/HTML/tags/entities
+      1) Normalize whitespace and line endings
+      2) Drop nav-like labels and obvious boilerplate lines
+      3) Lightly filter sentences (short, shouty, boiler-like)
+      4) Reassemble into coherent paragraphs
 
     If cleaning is too strict and most content is lost, fall back to
     lightly normalized text.
     """
     if not txt:
         return ""
+
+    # --- NUEVO: limpia HTML/CDATA/etiquetas antes de todo ---
+    txt = strip_html(txt)
 
     txt = _normalize(txt)
     lines = txt.split("\n")
