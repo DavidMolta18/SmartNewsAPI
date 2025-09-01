@@ -2,11 +2,12 @@ name: Terraform Apply
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
 
 permissions:
-  contents: read
   id-token: write
+  contents: read
 
 jobs:
   terraform-apply:
@@ -41,5 +42,7 @@ jobs:
             -var="project_id=${{ secrets.PROJECT_ID }}" \
             -var="region=${{ secrets.REGION }}" \
             -var="service_name=smartnewsapi" \
-            -var="image_url=placeholder"
+            -var="image_url=${{ secrets.REGION }}-docker.pkg.dev/${{ secrets.PROJECT_ID }}/smartnewsapi/smartnewsapi:${{ github.sha }}" \
+            -var="qdrant_url=${{ secrets.QDRANT_URL }}" \
+            -var="qdrant_api_key=${{ secrets.QDRANT_API_KEY }}"
         working-directory: ./infra
