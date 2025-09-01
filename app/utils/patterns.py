@@ -1,4 +1,3 @@
-# app/utils/patterns.py
 """
 Centralized regex patterns for boilerplate detection in news text.
 Used by quality.py (document-level cleaning) and text_utils.py (snippet cleanup).

@@ -1,4 +1,3 @@
-# app/routes/search.py
 from collections import defaultdict
 from typing import List
 from fastapi import APIRouter, Query, Depends

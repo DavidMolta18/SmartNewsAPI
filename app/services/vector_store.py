@@ -54,7 +54,6 @@ class QdrantIndex(VectorIndex):
     def __init__(self, url: str, collection: str, api_key: str | None = None):
         from qdrant_client import QdrantClient
 
-        # Conectar con Qdrant Cloud usando API key
         self.client = QdrantClient(url=url, api_key=api_key, prefer_grpc=False, timeout=30.0)
         self.collection = collection
 

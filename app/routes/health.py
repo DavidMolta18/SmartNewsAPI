@@ -1,4 +1,3 @@
-# app/routes/health.py
 from fastapi import APIRouter
 
 # Router for health-related endpoints

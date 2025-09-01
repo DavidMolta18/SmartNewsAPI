@@ -1,10 +1,8 @@
-# app/services/chunking.py
 from __future__ import annotations
 import json, re, time, random
 from typing import List
 from app.config import settings
 
-# estado mutable para inicialización de Vertex (evita global)
 _VERTEX_READY = {"ok": False}
 
 

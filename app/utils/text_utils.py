@@ -70,7 +70,7 @@ def get_vector_index(
     vi = QdrantIndex(
         settings.qdrant_url,
         settings.qdrant_collection,
-        api_key=os.getenv("QDRANT_API_KEY"),  # <-- ahora soporta Qdrant Cloud
+        api_key=os.getenv("QDRANT_API_KEY"),  
     )
     try:
         vi.ensure_collection(dim=getattr(provider, "dim", 384))

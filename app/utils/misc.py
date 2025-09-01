@@ -1,4 +1,3 @@
-# app/utils/misc.py
 import datetime as dt
 import time, random
 from typing import List
@@ -43,12 +42,19 @@ def embed_in_batches(
                 break
             except Exception as e:
                 attempt += 1
+
+                # Not a 429-like error → propagate original error (FastAPI will return 500)
                 if not is_429_error(e):
+                    raise
+
+                # Quota/rate limit exceeded after max retries → return 503
                 if attempt > max_retries:
                     raise HTTPException(
                         status_code=503,
                         detail="Embedding quota exhausted or rate limit hit. Try again later."
                     )
+
+                # Retry with exponential backoff + jitter
                 sleep_s = min(1.5 ** attempt + random.uniform(0, 0.3), 6.0)
                 print(f"[WARN] Embedding batch retry {attempt} after 429 (~{sleep_s:.2f}s)...")
                 time.sleep(sleep_s)
