@@ -41,12 +41,5 @@ jobs:
         working-directory: ./infra
 
       - name: Terraform Plan
-        id: plan
-        run: terraform plan -no-color > plan_output.txt
+        run: terraform plan -no-color
         working-directory: ./infra
-
-      - name: Post Plan to PR
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          header: Terraform Plan Result
-          path: ./infra/plan_output.txt
